@@ -141,6 +141,7 @@ docker-compose config
 
 ```bash
 # 扩展 Web 应用服务（启动 3 个实例）
+#指定container-name会导致名称重复，只指定一个port也会重复，建议去掉ontainer-name配置，port可以由env配置文件指定多个
 docker-compose up -d --scale webapp=3
 
 # 查看扩展后的服务
