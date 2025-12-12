@@ -1,0 +1,22 @@
+version: '3.8'
+
+# 简化版 Docker Compose 配置
+# 用于学习 Compose 基础概念，只包含最少的服务
+
+services:
+  # 简单的 Web 服务
+  web:
+    image: nginx:alpine
+    container_name: simple-web
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/html:/usr/share/nginx/html:ro
+    networks:
+      - simple-network
+
+# 定义网络
+networks:
+  simple-network:
+    driver: bridge
+

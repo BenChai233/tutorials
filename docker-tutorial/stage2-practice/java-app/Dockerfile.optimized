@@ -1,0 +1,48 @@
+# 优化版 Dockerfile - 使用多阶段构建和 Alpine 基础镜像
+# 阶段 1: 构建阶段
+FROM maven:3.9-eclipse-temurin-17 AS build
+
+# 设置工作目录
+WORKDIR /app
+
+# 复制 pom.xml 和下载依赖（利用 Docker 缓存）
+COPY pom.xml .
+RUN mvn dependency:go-offline -B
+
+# 复制源代码
+COPY src ./src
+
+# 构建应用
+RUN mvn clean package -DskipTests
+
+# 阶段 2: 运行阶段 - 使用 JRE Alpine 版本
+FROM eclipse-temurin:17-jre-alpine
+
+# 创建非 root 用户
+RUN addgroup -S appuser && adduser -S appuser -G appuser
+
+# 设置工作目录
+WORKDIR /app
+
+# 从构建阶段复制 JAR 文件
+COPY --from=build --chown=appuser:appuser /app/target/*.jar app.jar
+
+# 切换到非 root 用户
+USER appuser
+
+# 暴露端口
+EXPOSE 8080
+
+# 设置 JVM 参数优化内存使用
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
+
+# 启动应用
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
+
+# 优化说明：
+# 1. 使用 Alpine 版本的 JRE，镜像大小从 ~200MB 减少到 ~150MB
+# 2. 多阶段构建，最终镜像只包含运行时需要的 JAR 文件
+# 3. 使用非 root 用户运行，提高安全性
+# 4. 设置 JVM 参数以优化容器环境下的内存使用
+# 5. 使用 dependency:go-offline 提前下载依赖，利用 Docker 缓存层
+

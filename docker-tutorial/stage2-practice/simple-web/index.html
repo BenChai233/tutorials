@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Docker 镜像管理实践 - 简单 Web 应用</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .info {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .code {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🐳 Docker 镜像管理实践</h1>
+        <div class="info">
+            <h2>简单 Web 应用示例</h2>
+            <p>这是一个使用 Nginx 部署的静态 Web 应用，用于演示 Docker 镜像构建的基础操作。</p>
+        </div>
+        <div class="info">
+            <h3>构建命令：</h3>
+            <div class="code">docker build -t my-simple-web:1.0 .</div>
+        </div>
+        <div class="info">
+            <h3>运行命令：</h3>
+            <div class="code">docker run -d --name web-test -p 8080:80 my-simple-web:1.0</div>
+        </div>
+        <div class="info">
+            <h3>访问地址：</h3>
+            <div class="code">http://localhost:8080</div>
+        </div>
+    </div>
+</body>
+</html>
+

@@ -1,0 +1,17 @@
+# 优化版 Dockerfile - 使用 Alpine 版本减小镜像大小
+FROM nginx:alpine
+
+# 设置工作目录
+WORKDIR /usr/share/nginx/html
+
+# 复制本地文件到容器中
+COPY index.html /usr/share/nginx/html/
+
+# 暴露端口 80
+EXPOSE 80
+
+# 说明：使用 nginx:alpine 而不是 nginx:latest
+# Alpine 版本基于 Alpine Linux，镜像大小通常只有几 MB
+# 而 latest 版本基于 Debian，镜像大小可能有 100+ MB
+# 对于简单的静态网站，Alpine 版本完全够用
+

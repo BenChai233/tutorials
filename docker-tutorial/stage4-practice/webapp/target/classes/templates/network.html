@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Docker 网络实践</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .card {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .card h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 20px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        
+        .info-item {
+            margin: 10px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+        
+        .info-item strong {
+            color: #333;
+            display: block;
+            margin-bottom: 5px;
+        }
+        
+        .info-item span {
+            color: #666;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .status {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        
+        .status.connected {
+            background: #28a745;
+            color: white;
+        }
+        
+        .status.error {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .status.not_configured {
+            background: #ffc107;
+            color: #333;
+        }
+        
+        .network-diagram {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        .network-diagram h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+        
+        .diagram {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        
+        .network-box {
+            background: #f8f9fa;
+            border: 2px solid #667eea;
+            border-radius: 10px;
+            padding: 20px;
+            min-width: 200px;
+            text-align: center;
+        }
+        
+        .network-box h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+        
+        .service-item {
+            background: white;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 12px 30px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            transition: background 0.3s;
+            margin-top: 10px;
+        }
+        
+        .btn:hover {
+            background: #5568d3;
+        }
+        
+        pre {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 th:text="${appName}">Docker 网络实践</h1>
+            <p>容器网络通信演示应用</p>
+            <p style="margin-top: 10px;">
+                <strong>时间:</strong> <span th:text="${timestamp}"></span>
+            </p>
+        </div>
+        
+        <div class="info-grid">
+            <div class="card">
+                <h2>容器信息</h2>
+                <div class="info-item">
+                    <strong>主机名:</strong>
+                    <span th:text="${hostname}">unknown</span>
+                </div>
+                <div class="info-item">
+                    <strong>IP 地址:</strong>
+                    <span th:text="${ipAddress}">unknown</span>
+                </div>
+                <div class="info-item" th:if="${networkInfo}">
+                    <strong>规范主机名:</strong>
+                    <span th:text="${networkInfo.canonicalHostName}">unknown</span>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2>服务连接状态</h2>
+                <div th:if="${serviceConnections}">
+                    <div class="info-item">
+                        <strong>API 服务</strong>
+                        <span class="status" 
+                              th:classappend="${serviceConnections.apiService.status == 'connected'} ? 'connected' : 'error'"
+                              th:text="${serviceConnections.apiService.status}">unknown</span>
+                    </div>
+                    <div class="info-item">
+                        <strong>Redis</strong>
+                        <span class="status" 
+                              th:classappend="${serviceConnections.redis.status == 'connected'} ? 'connected' : (${serviceConnections.redis.status == 'not_configured'} ? 'not_configured' : 'error')"
+                              th:text="${serviceConnections.redis.status}">unknown</span>
+                    </div>
+                    <div class="info-item">
+                        <strong>MySQL</strong>
+                        <span class="status" 
+                              th:classappend="${serviceConnections.mysql.status == 'connected'} ? 'connected' : 'error'"
+                              th:text="${serviceConnections.mysql.status}">unknown</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="network-diagram">
+            <h2>网络架构</h2>
+            <div class="diagram">
+                <div class="network-box">
+                    <h3>Frontend Network</h3>
+                    <div class="service-item">webapp</div>
+                    <div class="service-item">api-service</div>
+                </div>
+                <div class="network-box">
+                    <h3>Backend Network</h3>
+                    <div class="service-item">mysql</div>
+                    <div class="service-item">redis</div>
+                    <div class="service-item">webapp</div>
+                    <div class="service-item">api-service</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>操作</h2>
+            <a href="/network/test" class="btn">运行网络测试</a>
+        </div>
+    </div>
+</body>
+</html>
+

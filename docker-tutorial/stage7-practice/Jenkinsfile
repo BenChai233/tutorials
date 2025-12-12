@@ -1,0 +1,112 @@
+pipeline {
+    agent any
+    
+    environment {
+        DOCKER_REGISTRY = "${env.DOCKER_REGISTRY ?: 'localhost:5000'}"
+        IMAGE_TAG = "${env.BUILD_NUMBER ?: 'latest'}"
+        PROJECT_NAME = 'stage7-practice'
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                echo 'Checking out source code...'
+                checkout scm
+            }
+        }
+        
+        stage('Build User Service') {
+            steps {
+                dir('user-service') {
+                    echo 'Building User Service...'
+                    sh 'mvn clean package -DskipTests'
+                }
+            }
+        }
+        
+        stage('Build Order Service') {
+            steps {
+                dir('order-service') {
+                    echo 'Building Order Service...'
+                    sh 'mvn clean package -DskipTests'
+                }
+            }
+        }
+        
+        stage('Build Gateway Service') {
+            steps {
+                dir('gateway-service') {
+                    echo 'Building Gateway Service...'
+                    sh 'mvn clean package -DskipTests'
+                }
+            }
+        }
+        
+        stage('Build Docker Images') {
+            steps {
+                script {
+                    echo 'Building Docker images...'
+                    sh """
+                        docker build -t ${DOCKER_REGISTRY}/${PROJECT_NAME}-user-service:${IMAGE_TAG} ./user-service
+                        docker build -t ${DOCKER_REGISTRY}/${PROJECT_NAME}-order-service:${IMAGE_TAG} ./order-service
+                        docker build -t ${DOCKER_REGISTRY}/${PROJECT_NAME}-gateway-service:${IMAGE_TAG} ./gateway-service
+                        
+                        docker tag ${DOCKER_REGISTRY}/${PROJECT_NAME}-user-service:${IMAGE_TAG} ${DOCKER_REGISTRY}/${PROJECT_NAME}-user-service:latest
+                        docker tag ${DOCKER_REGISTRY}/${PROJECT_NAME}-order-service:${IMAGE_TAG} ${DOCKER_REGISTRY}/${PROJECT_NAME}-order-service:latest
+                        docker tag ${DOCKER_REGISTRY}/${PROJECT_NAME}-gateway-service:${IMAGE_TAG} ${DOCKER_REGISTRY}/${PROJECT_NAME}-gateway-service:latest
+                    """
+                }
+            }
+        }
+        
+        stage('Push Docker Images') {
+            when {
+                branch 'main' || branch 'master'
+            }
+            steps {
+                script {
+                    echo 'Pushing Docker images to registry...'
+                    sh """
+                        docker push ${DOCKER_REGISTRY}/${PROJECT_NAME}-user-service:${IMAGE_TAG}
+                        docker push ${DOCKER_REGISTRY}/${PROJECT_NAME}-order-service:${IMAGE_TAG}
+                        docker push ${DOCKER_REGISTRY}/${PROJECT_NAME}-gateway-service:${IMAGE_TAG}
+                        
+                        docker push ${DOCKER_REGISTRY}/${PROJECT_NAME}-user-service:latest
+                        docker push ${DOCKER_REGISTRY}/${PROJECT_NAME}-order-service:latest
+                        docker push ${DOCKER_REGISTRY}/${PROJECT_NAME}-gateway-service:latest
+                    """
+                }
+            }
+        }
+        
+        stage('Deploy to Swarm') {
+            when {
+                branch 'main' || branch 'master'
+            }
+            steps {
+                script {
+                    echo 'Deploying to Docker Swarm...'
+                    sh """
+                        docker service update --image ${DOCKER_REGISTRY}/${PROJECT_NAME}-user-service:${IMAGE_TAG} ${PROJECT_NAME}_user-service || true
+                        docker service update --image ${DOCKER_REGISTRY}/${PROJECT_NAME}-order-service:${IMAGE_TAG} ${PROJECT_NAME}_order-service || true
+                        docker service update --image ${DOCKER_REGISTRY}/${PROJECT_NAME}-gateway-service:${IMAGE_TAG} ${PROJECT_NAME}_gateway-service || true
+                    """
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            echo 'Cleaning up...'
+            cleanWs()
+        }
+        success {
+            echo 'Pipeline succeeded!'
+        }
+        failure {
+            echo 'Pipeline failed!'
+        }
+    }
+}
+

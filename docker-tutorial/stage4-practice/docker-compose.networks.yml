@@ -1,0 +1,73 @@
+version: '3.8'
+
+# 此文件用于网络实验，演示不同的网络类型和配置
+
+services:
+  # 实验 1: 默认 bridge 网络
+  container-bridge-default:
+    image: alpine:latest
+    container_name: test-bridge-default
+    command: sleep 3600
+    # 不指定 networks，使用默认 bridge 网络
+
+  # 实验 2: 自定义 bridge 网络
+  container-bridge-custom:
+    image: alpine:latest
+    container_name: test-bridge-custom
+    command: sleep 3600
+    networks:
+      - custom-bridge-network
+
+  # 实验 3: Host 网络模式
+  container-host:
+    image: nginx:alpine
+    container_name: test-host-network
+    network_mode: host
+    # 注意：host 模式下，ports 映射无效
+
+  # 实验 4: None 网络模式
+  container-none:
+    image: alpine:latest
+    container_name: test-none-network
+    command: sleep 3600
+    network_mode: none
+    # 完全隔离，无网络连接
+
+  # 实验 5: 多网络容器
+  container-multi-network:
+    image: alpine:latest
+    container_name: test-multi-network
+    command: sleep 3600
+    networks:
+      - network-a
+      - network-b
+
+  # 实验 6: 网络别名测试
+  container-with-alias:
+    image: alpine:latest
+    container_name: test-with-alias
+    command: sleep 3600
+    networks:
+      alias-network:
+        aliases:
+          - alias1
+          - alias2
+          - my-service
+
+networks:
+  custom-bridge-network:
+    driver: bridge
+    name: custom-bridge-network
+
+  network-a:
+    driver: bridge
+    name: network-a
+
+  network-b:
+    driver: bridge
+    name: network-b
+
+  alias-network:
+    driver: bridge
+    name: alias-network
+

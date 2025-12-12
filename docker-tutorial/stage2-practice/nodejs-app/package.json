@@ -1,0 +1,20 @@
+{
+  "name": "docker-nodejs-app",
+  "version": "1.0.0",
+  "description": "Node.js 应用示例 - Docker 镜像管理实践",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "keywords": [
+    "docker",
+    "nodejs",
+    "express"
+  ],
+  "author": "",
+  "license": "MIT"
+}
+

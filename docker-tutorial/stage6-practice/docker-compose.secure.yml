@@ -1,0 +1,181 @@
+version: '3.8'
+
+# 安全加固版 Docker Compose 配置
+# 本文件展示了额外的安全配置：
+# - 使用非root用户运行容器
+# - 只读文件系统（部分目录）
+# - 限制容器能力（capabilities）
+# - 禁用特权模式
+
+services:
+  # MySQL 数据库服务（安全配置）
+  mysql:
+    image: mysql:8.0
+    container_name: stage6-mysql-secure
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-123456}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-testdb}
+      MYSQL_USER: ${MYSQL_USER:-appuser}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-apppass}
+    ports:
+      - "${MYSQL_PORT:-3307}:3306"
+    volumes:
+      - mysql-data-secure:/var/lib/mysql
+      - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    # 安全配置
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    read_only: false  # MySQL需要写入数据目录
+    tmpfs:
+      - /tmp
+      - /var/run/mysqld
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-123456}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - app-network-secure
+    restart: unless-stopped
+
+  # Redis 缓存服务（安全配置）
+  redis:
+    image: redis:7-alpine
+    container_name: stage6-redis-secure
+    ports:
+      - "${REDIS_PORT:-6380}:6379"
+    volumes:
+      - redis-data-secure:/data
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    command: redis-server /usr/local/etc/redis/redis.conf
+    # 安全配置
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETGID
+      - SETUID
+    read_only: false  # Redis需要写入数据
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - app-network-secure
+    restart: unless-stopped
+
+  # Spring Boot Web 应用（安全加固）
+  webapp:
+    build:
+      context: ./webapp
+      dockerfile: Dockerfile
+    container_name: stage6-webapp-secure
+    ports:
+      - "${WEBAPP_PORT:-8081}:8080"
+    volumes:
+      - ./logs:/app/logs
+    environment:
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILE:-prod}
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-testdb}?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      - SPRING_DATASOURCE_USERNAME=${MYSQL_USER:-appuser}
+      - SPRING_DATASOURCE_PASSWORD=${MYSQL_PASSWORD:-apppass}
+      - SPRING_REDIS_HOST=redis
+      - SPRING_REDIS_PORT=6379
+      - TZ=Asia/Shanghai
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # 安全配置
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE  # 绑定端口需要
+    # 只读文件系统（除了必要的可写目录）
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/logs  # 日志目录使用tmpfs（或使用volume挂载）
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+        compress: "true"
+    networks:
+      - app-network-secure
+    restart: unless-stopped
+
+volumes:
+  mysql-data-secure:
+    driver: local
+    name: stage6-mysql-data-secure
+  redis-data-secure:
+    driver: local
+    name: stage6-redis-data-secure
+
+networks:
+  app-network-secure:
+    driver: bridge
+    name: stage6-app-network-secure
+    ipam:
+      config:
+        - subnet: 172.32.0.0/16
+          gateway: 172.32.0.1
+

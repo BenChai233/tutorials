@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Docker 高级主题实践</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .header h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .header p {
+            color: #666;
+            font-size: 14px;
+        }
+        .nav {
+            background: white;
+            border-radius: 10px;
+            padding: 15px 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .nav a {
+            color: #667eea;
+            text-decoration: none;
+            margin-right: 20px;
+            font-weight: 500;
+        }
+        .nav a:hover {
+            text-decoration: underline;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .card h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 20px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        .info-item {
+            margin-bottom: 10px;
+            padding: 8px;
+            background: #f5f5f5;
+            border-radius: 5px;
+        }
+        .info-label {
+            font-weight: 600;
+            color: #555;
+            display: inline-block;
+            min-width: 120px;
+        }
+        .info-value {
+            color: #333;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #5568d3;
+        }
+        .btn-success {
+            background: #48bb78;
+            color: white;
+        }
+        .btn-success:hover {
+            background: #38a169;
+        }
+        .btn-warning {
+            background: #ed8936;
+            color: white;
+        }
+        .btn-warning:hover {
+            background: #dd6b20;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 5px;
+            display: none;
+        }
+        .result.success {
+            background: #c6f6d5;
+            color: #22543d;
+            display: block;
+        }
+        .result.error {
+            background: #fed7d7;
+            color: #742a2a;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🐳 Docker 高级主题实践</h1>
+            <p>演示资源限制、健康检查、安全加固、日志管理等高级特性</p>
+        </div>
+
+        <div class="nav">
+            <a href="/advanced">高级特性</a>
+            <a href="/resources">资源监控</a>
+            <a href="/actuator/health">健康检查</a>
+            <a href="/actuator/info">应用信息</a>
+        </div>
+
+        <div class="info-grid">
+            <div class="card">
+                <h2>系统信息</h2>
+                <div class="info-item">
+                    <span class="info-label">当前时间:</span>
+                    <span class="info-value" th:text="${currentTime}">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Java版本:</span>
+                    <span class="info-value" th:text="${javaVersion}">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">操作系统:</span>
+                    <span class="info-value" th:text="${osName}">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">运行用户:</span>
+                    <span class="info-value" th:text="${userName}">-</span>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>日志管理测试</h2>
+                <p style="color: #666; margin-bottom: 15px;">
+                    生成不同级别的日志，用于测试日志驱动和日志轮转配置
+                </p>
+                <div class="button-group">
+                    <button class="btn btn-primary" onclick="generateLogs()">生成日志</button>
+                </div>
+                <div id="logResult" class="result"></div>
+            </div>
+
+            <div class="card">
+                <h2>健康检查</h2>
+                <p style="color: #666; margin-bottom: 15px;">
+                    查看应用健康状态和详细信息
+                </p>
+                <div class="button-group">
+                    <button class="btn btn-success" onclick="checkHealth()">检查健康状态</button>
+                    <button class="btn btn-primary" onclick="getSystemInfo()">获取系统信息</button>
+                </div>
+                <div id="healthResult" class="result"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function generateLogs() {
+            const resultDiv = document.getElementById('logResult');
+            resultDiv.className = 'result';
+            resultDiv.textContent = '正在生成日志...';
+            
+            try {
+                const response = await fetch('/advanced/generate-logs');
+                const data = await response.json();
+                resultDiv.className = 'result success';
+                resultDiv.textContent = data.message || '日志生成成功！请查看容器日志。';
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = '错误: ' + error.message;
+            }
+        }
+
+        async function checkHealth() {
+            const resultDiv = document.getElementById('healthResult');
+            resultDiv.className = 'result';
+            resultDiv.textContent = '正在检查健康状态...';
+            
+            try {
+                const response = await fetch('/advanced/health-info');
+                const data = await response.json();
+                resultDiv.className = 'result success';
+                resultDiv.innerHTML = `
+                    <strong>状态:</strong> ${data.status}<br>
+                    <strong>时间戳:</strong> ${data.timestamp}<br>
+                    <strong>可用处理器:</strong> ${data.availableProcessors}<br>
+                    <strong>最大内存:</strong> ${(data.maxMemory / 1024 / 1024).toFixed(2)} MB
+                `;
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = '错误: ' + error.message;
+            }
+        }
+
+        async function getSystemInfo() {
+            const resultDiv = document.getElementById('healthResult');
+            resultDiv.className = 'result';
+            resultDiv.textContent = '正在获取系统信息...';
+            
+            try {
+                const response = await fetch('/advanced/system-info');
+                const data = await response.json();
+                resultDiv.className = 'result success';
+                let html = '';
+                for (const [key, value] of Object.entries(data)) {
+                    html += `<strong>${key}:</strong> ${value}<br>`;
+                }
+                resultDiv.innerHTML = html;
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = '错误: ' + error.message;
+            }
+        }
+    </script>
+</body>
+</html>
+

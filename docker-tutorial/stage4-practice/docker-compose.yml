@@ -1,0 +1,151 @@
+version: '3.8'
+
+services:
+  # MySQL 数据库服务 - 仅连接后端网络
+  mysql:
+    image: mysql:8.0
+    container_name: mysql-network-practice
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_DATABASE: testdb
+      MYSQL_USER: appuser
+      MYSQL_PASSWORD: apppass
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p123456"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      backend-network:
+        aliases:
+          - db
+          - database
+    restart: unless-stopped
+
+  # Redis 缓存服务 - 仅连接后端网络
+  redis:
+    image: redis:7-alpine
+    container_name: redis-network-practice
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    command: redis-server /usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      backend-network:
+        aliases:
+          - cache
+    restart: unless-stopped
+
+  # Python Flask API 服务 - 连接前端和后端网络
+  api-service:
+    build:
+      context: ./api-service
+      dockerfile: Dockerfile
+    container_name: api-service-network-practice
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=development
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_DATABASE=testdb
+      - MYSQL_USER=appuser
+      - MYSQL_PASSWORD=apppass
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      frontend-network:
+        aliases:
+          - api
+          - backend-api
+      backend-network:
+        aliases:
+          - api-backend
+    restart: unless-stopped
+
+  # Spring Boot Web 应用 - 连接前端和后端网络
+  webapp:
+    build:
+      context: ./webapp
+      dockerfile: Dockerfile.dev
+    container_name: webapp-network-practice
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./webapp:/app
+      - maven-cache:/root/.m2
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+      - SPRING_DEVTOOLS_RESTART_ENABLED=true
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/testdb?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      - SPRING_DATASOURCE_USERNAME=appuser
+      - SPRING_DATASOURCE_PASSWORD=apppass
+      - API_SERVICE_URL=http://api-service:5000
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api-service:
+        condition: service_started
+    networks:
+      frontend-network:
+        aliases:
+          - web
+          - frontend
+      backend-network:
+        aliases:
+          - web-backend
+    restart: unless-stopped
+
+# 定义数据卷
+volumes:
+  mysql-data:
+    driver: local
+    name: mysql-network-practice-data
+  redis-data:
+    driver: local
+    name: redis-network-practice-data
+  maven-cache:
+    driver: local
+    name: maven-cache
+
+# 定义网络
+networks:
+  # 前端网络 - 用于 Web 应用和 API 服务之间的通信
+  frontend-network:
+    driver: bridge
+    name: frontend-network
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+          gateway: 172.20.0.1
+
+  # 后端网络 - 用于数据库和缓存服务
+  backend-network:
+    driver: bridge
+    name: backend-network
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
+          gateway: 172.21.0.1
+

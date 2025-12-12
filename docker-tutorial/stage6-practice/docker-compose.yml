@@ -1,0 +1,161 @@
+version: '3.8'
+
+# Docker Compose 配置文件
+# 本文件展示了Docker高级主题：
+# - 容器资源限制（CPU、内存）
+# - 容器健康检查
+# - Docker日志管理（日志驱动、日志轮转）
+# - 安全配置（非root用户）
+
+services:
+  # MySQL 数据库服务
+  mysql:
+    image: mysql:8.0
+    container_name: stage6-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-123456}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-testdb}
+      MYSQL_USER: ${MYSQL_USER:-appuser}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-apppass}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    # 健康检查配置
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-123456}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    # 资源限制配置
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    # 日志配置（日志驱动、日志轮转）
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  # Redis 缓存服务
+  redis:
+    image: redis:7-alpine
+    container_name: stage6-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    command: redis-server /usr/local/etc/redis/redis.conf
+    # 健康检查配置
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    # 资源限制配置
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    # 日志配置
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  # Spring Boot Web 应用
+  webapp:
+    build:
+      context: ./webapp
+      dockerfile: Dockerfile
+    container_name: stage6-webapp
+    ports:
+      - "${WEBAPP_PORT:-8080}:8080"
+    volumes:
+      # 日志目录挂载（用于日志持久化）
+      - ./logs:/app/logs
+      # Maven 本地仓库缓存（加速构建）
+      - maven-cache:/root/.m2
+    environment:
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILE:-prod}
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-testdb}?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      - SPRING_DATASOURCE_USERNAME=${MYSQL_USER:-appuser}
+      - SPRING_DATASOURCE_PASSWORD=${MYSQL_PASSWORD:-apppass}
+      - SPRING_REDIS_HOST=redis
+      - SPRING_REDIS_PORT=6379
+      - TZ=Asia/Shanghai
+    # 服务依赖：等待 MySQL 和 Redis 健康检查通过
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # 健康检查配置（docker-compose级别，会覆盖Dockerfile中的HEALTHCHECK）
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    # 资源限制配置
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    # 日志配置（日志驱动、日志轮转）
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+        compress: "true"
+    networks:
+      - app-network
+    restart: unless-stopped
+
+# 定义数据卷
+volumes:
+  mysql-data:
+    driver: local
+    name: stage6-mysql-data
+  redis-data:
+    driver: local
+    name: stage6-redis-data
+  maven-cache:
+    driver: local
+    name: stage6-maven-cache
+
+# 定义网络
+networks:
+  app-network:
+    driver: bridge
+    name: stage6-app-network
+    ipam:
+      config:
+        - subnet: 172.31.0.0/16
+          gateway: 172.31.0.1
+

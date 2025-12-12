@@ -1,0 +1,13 @@
+# 开发环境 Dockerfile
+# 用于支持绑定挂载和热重载
+FROM maven:3.9-eclipse-temurin-17
+
+# 设置工作目录
+WORKDIR /app
+
+# 暴露端口
+EXPOSE 8080
+
+# 使用 Maven 运行 Spring Boot（支持热重载）
+CMD ["mvn", "spring-boot:run"]
+

@@ -1,0 +1,77 @@
+version: '3.8'
+
+# Docker Registry 私有仓库配置
+# 本文件用于搭建私有Docker镜像仓库
+
+services:
+  # Docker Registry 私有仓库
+  registry:
+    image: registry:2
+    container_name: stage6-registry
+    ports:
+      - "${REGISTRY_PORT:-5000}:5000"
+    environment:
+      # 配置存储后端（可选：S3、Azure、GCS等）
+      REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY: /var/lib/registry
+      # 允许删除镜像（默认不允许）
+      REGISTRY_STORAGE_DELETE_ENABLED: "true"
+    volumes:
+      - registry-data:/var/lib/registry
+      # 可选：挂载配置文件
+      # - ./registry/config.yml:/etc/docker/registry/config.yml:ro
+    # 健康检查
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5000/v2/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    # 日志配置
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - registry-network
+    restart: unless-stopped
+
+  # 可选：Registry UI（可视化界面）
+  registry-ui:
+    image: joxit/docker-registry-ui:latest
+    container_name: stage6-registry-ui
+    ports:
+      - "${REGISTRY_UI_PORT:-8082}:80"
+    environment:
+      - REGISTRY_TITLE=Docker Registry UI
+      - REGISTRY_URL=http://registry:5000
+      - DELETE_IMAGES=true
+      - SHOW_CATALOG_NB_TAGS=true
+      - CATALOG_MIN_BRANCHES=1
+      - CATALOG_MAX_BRANCHES=1
+      - TAGLIST_PAGE_SIZE=100
+      - REGISTRY_SECURED=false
+    depends_on:
+      - registry
+    networks:
+      - registry-network
+    restart: unless-stopped
+
+volumes:
+  registry-data:
+    driver: local
+    name: stage6-registry-data
+
+networks:
+  registry-network:
+    driver: bridge
+    name: stage6-registry-network
+
