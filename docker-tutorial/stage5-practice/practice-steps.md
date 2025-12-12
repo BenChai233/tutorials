@@ -101,7 +101,7 @@ docker-compose config | head -5
 docker-compose config --services
 
 # 查看特定服务的配置
-docker-compose config mysql
+docker-compose config --services | grep mysql
 ```
 
 **关键点**：
