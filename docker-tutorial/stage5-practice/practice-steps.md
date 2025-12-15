@@ -488,7 +488,7 @@ docker-compose exec webapp ping -c 3 redis
 docker-compose exec nginx ping -c 3 webapp
 
 # 测试 HTTP 连接
-docker-compose exec webapp wget -qO- http://localhost:8080/health
+docker-compose exec webapp wget -qO- http://localhost:8080/actuator/health
 ```
 
 ### 5.3 访问应用
