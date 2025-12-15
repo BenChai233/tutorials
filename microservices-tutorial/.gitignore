@@ -1,0 +1,5 @@
+/.idea/
+/*/target/
+/stage1-monolith-order/stage1-monolith-order.iml
+/*/*.iml
+/stage1-monolith-order/target/classes/
